@@ -8,24 +8,53 @@ from torch.utils.data import (
     Dataset
 )
 import tifffile
+import pdb
+import os
 
 
 class TiffDataset(Dataset):
     """Documentation for TiffDataset
 
     """
-    def __init__(self, glob):
+    def __init__(self, img_path, img_list, channel=1, test=False):
         super(TiffDataset, self).__init__()
-        glob = Path(glob)
-        self.glob = glob
-        self.paths = tiffs.natural_sorted(Path(glob.parent).glob(glob.name))
+        #concatenate the path and the image name
+        with open(img_list, 'r') as f:
+            img_names = f.read().splitlines()
+        self.paths = [os.path.join(img_path,img) for img in img_names]
+        self.channel = channel
+        self.test = test
 
     def __getitem__(self, i):
-        img = tifffile.imread(str(self.paths[i]))
+        try:
+            if self.channel == 1:
+                img = tifffile.imread(str(self.paths[i])).astype(np.float32)
+                if img.ndim == 2:
+                    img = img[None, ...]
+            else: #stacking 2.5D images
+                img_list = []
+                for j in range(i - self.channel//2, i + self.channel//2 + 1):
+                    if j < 0:
+                        img_temp = tifffile.imread(str(self.paths[0])).astype(np.float32)
+                        if img_temp.ndim == 2:
+                            img_temp = img_temp[None, ...]
+                        img_list.append(img_temp)
+                    elif j >= len(self.paths):
+                        img_temp = tifffile.imread(str(self.paths[i])).astype(np.float32)
+                        if img_temp.ndim == 2:
+                            img_temp = img_temp[None, ...]
+                        img_list.append(img_temp)
+                    else:
+                        img_temp = tifffile.imread(str(self.paths[j])).astype(np.float32)
+                        if img_temp.ndim == 2:
+                            img_temp = img_temp[None, ...]
+                        img_list.append(img_temp)
+                img = np.vstack(img_list)
+        except Exception as e:
+            print(e)
+            print(self.paths[i])
+            #pdb.set_trace()
 
-        # Add channel dimension if not present
-        if img.ndim == 2:
-            img = img[None, ...]
 
         return torch.from_numpy(img)
 
@@ -55,14 +84,14 @@ class Noise2InverseDataset(Dataset):
     """Documentation for Noise2InverseDataset
 
     """
-    def __init__(self, *datasets, strategy="X:1"):
+    def __init__(self, *datasets, strategy="X:1", test = False):
         super(Noise2InverseDataset, self).__init__()
 
         self.datasets = datasets
         max_len = max(len(ds) for ds in datasets)
         min_len = min(len(ds) for ds in datasets)
 
-        assert min_len == max_len
+        assert min_len == max_len #checking each split has equal number of slices
 
         assert strategy in ["X:1", "1:X"]
         self.strategy = strategy
@@ -71,6 +100,8 @@ class Noise2InverseDataset(Dataset):
             num_input = self.num_splits - 1
         else:
             num_input = 1
+
+        self.test = test
 
         # For num_splits=4, 1:X, we have
         # input_idxs =  [(0,),      (1,),      (2,),      (3,)]
@@ -84,19 +115,20 @@ class Noise2InverseDataset(Dataset):
         return len(self.datasets)
 
     @property
-    def num_slices(self):
+    def num_slices(self): #total number of slices so is img_num * split
         return len(self.datasets[0])
 
     def __getitem__(self, i):
+        
         num_splits = self.num_splits
-        slice_idx = i // num_splits
-        split_idx = i % num_splits
+        slice_idx = i // num_splits #get the slice index
+        split_idx = i % num_splits #get the split index, ie which subset
 
         input_idxs = self.input_idxs[split_idx]
         target_idxs = self.target_idxs[split_idx]
 
-        slices = [ds[slice_idx] for ds in self.datasets]
-        inputs = [slices[j] for j in input_idxs]
+        slices = [ds[slice_idx] for ds in self.datasets] #take the slice in all split, read the file
+        inputs = [slices[j] for j in input_idxs] #take the slice from the input splits
         targets = [slices[j] for j in target_idxs]
 
         inp = torch.mean(torch.stack(inputs), dim=0)

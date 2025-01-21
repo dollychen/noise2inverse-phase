@@ -1,0 +1,24 @@
+#wandb config
+wandb_project: "test_project" #test_project, noise2inverse
+wandb_run_mode: "disabled" # online, offline, disabled
+job_name_prefix: test_job #job name to identify the function
+test_run: False  #sets wandb project as test_project, set true will only run a few batches per epoch
+
+#data config
+data_path: "C:/Users/Dolly/Documents/A.Study/data/test/foam_sim_test" #training data
+train_data_list: "./configs/test/data_list_foam.txt" #.txt file containing images to be trained
+
+#model config
+model_path: "C:/Users/Dolly/Documents/A.Study/models/test" #where to save the model
+resume_training: #path to checkpoint
+num_splits: 2
+strategy: "X:1" # "i:X"
+batch_size: 16 #split between gpus
+data_scaling: 0.005 #65536 #for normalisation
+epochs: 10
+network: "unet" # "msd", "unet", "dncnn"
+multi_gpu: False
+n_features: 64
+input_channels: 1 #more for 2.5D
+gpu_id: 0 #set which gpu to use when not using multi_gpu
+
