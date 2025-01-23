@@ -57,9 +57,9 @@ if __name__ == '__main__':
     # parse arguments
     parser = argparse.ArgumentParser(description='Generate train list')
     parser.add_argument('--train_data_path', type=str, help='path to training images', \
-                        default='D:/Dolly\A.Study\data\kidney_left/2021_17/25.14um/recon\orig_recon_joseph/all\split_2/1')
+                        default='C:/Users\Dolly\Documents\A.Study\data/test\kidney_left_test_data/1/HA-900_25.14um_LADAF-2021-17_kidney_left_011__pag-0.01_0.92_')
     parser.add_argument('--file_ext', type=str, help='file extension', default='.tif')
-    parser.add_argument('--output_file', type=str, help='path and name to output file', default='./configs/kidney/kidney_inf_data_list_all.txt')
+    parser.add_argument('--output_file', type=str, help='path and name to output file', default='./configs/kidney/data_list_kidney_test.txt')
     parser.add_argument('--include_all', type = bool, help = 'if all images are needed', default = True)
     parser.add_argument('--imgs_to_include', type = str, help = 'if a small list is needed set the number of image to randomly select,\
                          set to -1 if not needed', default = -1)

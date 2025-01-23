@@ -1,0 +1,20 @@
+#data config
+data_path: "C:/Users/Dolly/Documents/A.Study/data/test/foam_sim_test" #data path of images to be inferred 
+data_list: "./configs/test/data_list_foam.txt" #.txt file containing images to be predicted
+
+#model config
+model_path: "C:/Users/Dolly/Documents/A.Study/models/test/test_job_20250121-175252" #the model checkpoint directory
+checkpoint_name: "weights_epoch_3_0.872559.torch"
+num_splits: 2
+strategy: "X:1" # "i:X"
+data_scaling: 200 #65536 #for normalisation
+n_features: 64
+network: "unet" # "msd", "unet", "dncnn"
+
+multi_gpu: False
+
+input_channels: 1 #more for 2.5D
+gpu_id: 0 #set which gpu to use when not using multi_gpu
+
+#prediction config  
+save_split_pred: True #save the split predictions
