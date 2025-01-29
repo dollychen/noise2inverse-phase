@@ -1,5 +1,5 @@
 from pathlib import Path
-from noise2inverse import tiffs, noise, fig
+from noise2inverse import tiffs, noise
 from noise2inverse.datasets import (
     TiffDataset,
     Noise2InverseDataset,
