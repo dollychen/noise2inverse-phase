@@ -1,5 +1,5 @@
 from pathlib import Path
-from noise2inverse import tiffs, noise, fig
+from noise2inverse import tiffs, noise
 from noise2inverse.datasets import (
     TiffDataset,
     Noise2InverseDataset,
@@ -88,7 +88,7 @@ def predict(config_file):
 
     # load model
     print('loading weights:', model_path / checkpoint_name)
-    checkpoint = torch.load(model_path / checkpoint_name)
+    checkpoint = torch.load(model_path / checkpoint_name, weights_only=True)
     if multi_gpu:
         
         #network.load_state_dict(checkpoint['state_dict'])
@@ -147,15 +147,15 @@ def predict(config_file):
                 #save output image
                 out_path_0 = str(split_0_dir / f"{test_img_names[i]}")
                 out_path_1 = str(split_1_dir / f"{test_img_names[i]}")
-                tifffile.imsave(out_path_0, inf_out_0_np)
-                tifffile.imsave(out_path_1, inf_out_1_np)
+                tifffile.imwrite(out_path_0, inf_out_0_np)
+                tifffile.imwrite(out_path_1, inf_out_1_np)
 
             test_output_img = test_output.mean(axis = 0) * data_scaling # averaged over batch size as it is the number of splits
             
             #save output image
             test_out_np = (test_output_img).detach().cpu().numpy().squeeze()
             out_path = str(avg_output_dir / f"{test_img_names[i]}")
-            tifffile.imsave(out_path, test_out_np)
+            tifffile.imwrite(out_path, test_out_np)
             end = time.time()
             #print(f"prediction time for {test_img_names[i]} is {end - start}")
 
