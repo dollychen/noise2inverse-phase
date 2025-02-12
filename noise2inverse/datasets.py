@@ -10,6 +10,7 @@ from torch.utils.data import (
 import tifffile
 import pdb
 import os
+from torchvision.transforms.functional import crop as tv_crop
 
 
 class TiffDataset(Dataset):
@@ -84,10 +85,10 @@ class Noise2InverseDataset(Dataset):
     """Documentation for Noise2InverseDataset
 
     """
-    def __init__(self, *datasets, strategy="X:1", test = False):
+    def __init__(self, *datasets, strategy="X:1", test = False, crop_size=None, center_weight=0.0, num_crops=1):
         super(Noise2InverseDataset, self).__init__()
 
-        self.datasets = datasets
+        self.datasets = datasets #list of datasets for each split
         max_len = max(len(ds) for ds in datasets)
         min_len = min(len(ds) for ds in datasets)
 
@@ -110,6 +111,11 @@ class Noise2InverseDataset(Dataset):
         self.input_idxs = list(combinations(split_idxs, num_input))
         self.target_idxs = [split_idxs - set(idxs) for idxs in self.input_idxs]
 
+        # Crop parameters
+        self.crop_size = crop_size
+        self.center_weight = center_weight
+        self.num_crops = num_crops
+
     @property
     def num_splits(self):
         return len(self.datasets)
@@ -119,17 +125,43 @@ class Noise2InverseDataset(Dataset):
         return len(self.datasets[0])
 
     def __getitem__(self, i):
+        # set crop index
+        non_crop_idex = i // self.num_crops #get the index of the original dataset length (no of slices * no of splits)
         
         num_splits = self.num_splits
-        slice_idx = i // num_splits #get the slice index
-        split_idx = i % num_splits #get the split index, ie which subset
+        slice_idx = non_crop_idex // num_splits #get the slice index so that every n index is the same slice but different split so different input and target
+        split_idx = non_crop_idex % num_splits #get the split index, ie which subset, 
 
         input_idxs = self.input_idxs[split_idx]
         target_idxs = self.target_idxs[split_idx]
 
-        slices = [ds[slice_idx] for ds in self.datasets] #take the slice in all split, read the file
-        inputs = [slices[j] for j in input_idxs] #take the slice from the input splits
-        targets = [slices[j] for j in target_idxs]
+        slices = [ds[slice_idx] for ds in self.datasets] #take the slices in each split (dataset), read the file from __getitem__ TiffDataset
+
+
+
+
+        # crop the slices 
+        if self.crop_size is not None:
+            # Convert each slice to a numpy array if needed
+            # directory operate on the tensor
+            # If we want the same random crop across all slices,
+            # we need to compute a single offset from the first slice's shape.
+            if (self.crop_size is not None) and (len(slices) > 0):
+                c, h, w = slices[0].shape
+                crop_h = self.crop_size
+                crop_w = self.crop_size
+                if (crop_h > 0 and crop_w > 0 and crop_h <= h and crop_w <= w):
+                    offset_y, offset_x = self._compute_random_offset(h, w, crop_h, crop_w)
+                    # Crop all slices with the same offset
+                    cropped_slices = [self._apply_crop(s, offset_y, offset_x, crop_h, crop_w)
+                                    for s in slices]
+
+            inputs = [cropped_slices[j] for j in input_idxs] #take the slice from the input splits
+            targets = [cropped_slices[j] for j in target_idxs] #take the slice from the target splits
+
+        else:
+            inputs = [slices[j] for j in input_idxs] #take the slice from the input splits
+            targets = [slices[j] for j in target_idxs]
 
         inp = torch.mean(torch.stack(inputs), dim=0)
         tgt = torch.mean(torch.stack(targets), dim=0)
@@ -137,4 +169,26 @@ class Noise2InverseDataset(Dataset):
         return inp, tgt
 
     def __len__(self):
-        return self.num_splits * self.num_slices
+        return self.num_splits * self.num_slices * self.num_crops
+
+    def _compute_random_offset(self, h, w, crop_h, crop_w):
+        # Calculate the valid range for top-left corner of the crop
+        max_y = h - crop_h
+        max_x = w - crop_w
+
+        # The center offset
+        center_y = (h - crop_h) // 2
+        center_x = (w - crop_w) // 2
+
+        # The random offset (uniform)
+        rand_y = np.random.randint(0, max_y + 1)
+        rand_x = np.random.randint(0, max_x + 1)
+
+        # Interpolate between center and random offset
+        offset_y = int((1 - self.center_weight) * rand_y + self.center_weight * center_y)
+        offset_x = int((1 - self.center_weight) * rand_x + self.center_weight * center_x)
+        return offset_y, offset_x
+
+    def _apply_crop(self, img, offset_y, offset_x, crop_h, crop_w):
+        return tv_crop(img, offset_y, offset_x, crop_h, crop_w)
+

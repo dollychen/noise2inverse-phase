@@ -6,3 +6,4 @@ __pycache__
 output_*.tif
 proj.h5
 !output_00256.tif
+/wandb

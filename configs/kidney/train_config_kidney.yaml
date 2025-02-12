@@ -1,0 +1,29 @@
+#wandb config
+wandb_project: "test_project" #test_project, noise2inverse
+wandb_run_mode: "offline" # online, offline, disabled
+job_name_prefix: kidney_25um_pag_crop_random_1scan_11 #job name to identify the function
+test_run: False  #sets wandb project as test_project, set true will only run a few batches per epoch
+
+#data config
+data_path: "/hdd/dolly/data/test/hipct_test_kidney_scan_11/" #training data
+train_data_list: "./configs/kidney/data_list_kidney_test.txt" #.txt file containing images to be trained
+crop_size: 100
+centre_weight: 0.5
+no_crop_per_image: 2
+
+
+#model config
+model_path: "/hdd/dolly/models/noise2inverse_organised/cropped_image/" #where to save the model
+resume_training: #path to checkpoint
+num_splits: 2
+strategy: "X:1" # "i:X"
+batch_size: 32 #split between gpus
+data_scaling: 0.005 #65536 #for normalisation
+epochs: 2
+network: "unet" # "msd", "unet", "dncnn"
+multi_gpu: True
+n_features: 64
+input_channels: 1 #more for 2.5D
+gpu_id: 0 #set which gpu to use when not using multi_gpu
+
+
