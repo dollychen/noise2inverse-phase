@@ -1,27 +1,35 @@
+print("importing modules")
+import time
+start = time.time()
+print("importing sys")
 import sys
 sys.path.append("../noise2inverse/")
+print("importing numpy")
 import numpy as np
 from pathlib import Path
 #from noise2inverse import tiffs, noise, fig
-from noise2inverse.datasets import (
-    TiffDataset,
-    Noise2InverseDataset,
-)
 
+print("importing tifffile")
 import tifffile
+from tqdm import tqdm
+
+print("importing wandb")
+import wandb
+
+print("importing torch") #moving import here so that incorrect path is discovered before loading the dataloader
 import torch
 from torch.utils.data import DataLoader
-import torch.nn as nn
-from tqdm import tqdm
-import wandb
-from scripts.utils import *
+import torch.nn as nn  
+
+print("importing other modules that should be fast")
 import datetime
 import os
 import argparse
 import yaml
-import pdb
-from scripts.utils import percetile_stretch, psnr_skimage, ssim_skimage
+from scripts.utils import percetile_stretch, psnr_skimage, ssim_skimage, network_setup
 
+end = time.time()
+print(f"importing modules took {end-start} seconds")
 
 print("imported all modules")
 # # Scale pixel intensities during training such that its values roughly occupy the range [0,1].
@@ -77,12 +85,19 @@ def train(params):
 
 
     print("--------------------------------------------------------------loading train data--------------------------------------------------------------")
+    print("importing noise2inverse dataset modules") #moving import here so that incorrect path is discovered before loading the dataset
+    from noise2inverse.datasets import (
+        TiffDataset,
+        Noise2InverseDataset,
+    )
+
     #load dataset using the list given
     train_datasets = [TiffDataset(f"{train_data_path}/{j}", train_data_list, channel=input_channels) for j in range(num_splits)]
     train_ds = Noise2InverseDataset(*train_datasets, strategy=strategy, crop_size=crop_size, center_weight=centre_weight)
     val_ds = Noise2InverseDataset(*train_datasets, strategy=strategy)
 
-    
+
+    print("--------------------------------------------------------------loading dataloader--------------------------------------------------------------")
     # Dataloader and network:
     train_dl = DataLoader(train_ds, batch_size, shuffle=True,)
 
