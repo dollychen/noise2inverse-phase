@@ -92,7 +92,7 @@ def train(params):
     )
 
     #load dataset using the list given
-    train_datasets = [TiffDataset(f"{train_data_path}/{j}", train_data_list, channel=input_channels) for j in range(num_splits)]
+    train_datasets = [TiffDataset(f"{train_data_path}", train_data_list, channel=input_channels)]
     train_ds = Noise2InverseDataset(*train_datasets, strategy=strategy, crop_size=crop_size, center_weight=centre_weight)
     val_ds = Noise2InverseDataset(*train_datasets, strategy=strategy)
 
@@ -132,7 +132,7 @@ def train(params):
     
     # The dataset contains multiple input-target pairs for each slice. 
     # Therefore, we divide by the number of splits to obtain the effective number of epochs.
-    train_epochs = max(epochs // num_splits, 1)
+    train_epochs = epochs
     torch.cuda.empty_cache() # clear GPU memory
 
 
@@ -206,7 +206,7 @@ def train(params):
                 torch.cuda.empty_cache() # clear GPU memory
                 test_inp = inp.cuda(non_blocking=True) / data_scaling # scale the input
                 test_output = network(test_inp)
-                test_output_img = test_output.mean(axis = 0) * data_scaling # averaged over batch size as it is the number of splits
+                test_output_img = test_output[0] # averaged over batch size as it is the number of splits
 
                 #save output image
                 test_out_np = (test_output_img).detach().cpu().numpy().squeeze()
@@ -243,7 +243,7 @@ if __name__ == "__main__":
     # set config file
     print("Starting training script")
     parser = argparse.ArgumentParser(description='Noise2Inverse training script')
-    parser.add_argument('--config', type=str, default='./configs/kidney/train_config_kidney.yaml', help='path to config file')
+    parser.add_argument('--config', type=str, default='./configs/test/train_config_kidney.yaml', help='path to config file')
     args = parser.parse_args()
 
     # load config file

@@ -21,16 +21,18 @@ class TiffDataset(Dataset):
         #concatenate the path and the image name
         with open(img_list, 'r') as f:
             img_names = f.read().splitlines()
-        self.paths = [os.path.join(img_path,img) for img in img_names]
+        self.low_res_paths = [os.path.join(os.path.join(img_path, "low_res"),img) for img in img_names]
+        self.high_res_paths = [os.path.join(os.path.join(img_path, "high_res"),img) for img in img_names]
         self.channel = channel
         self.test = test
 
     def __getitem__(self, i):
         try:
             if self.channel == 1:
-                img = tifffile.imread(str(self.paths[i])).astype(np.float32)
-                if img.ndim == 2:
-                    img = img[None, ...]
+                lowres_img = tifffile.imread(str(self.low_res_paths[i])).astype(np.float32)
+                highres_img = tifffile.imread(str(self.high_res_paths[i])).astype(np.float32)
+                #if img.ndim == 2:
+                #    img = img[None, ...]
             else: #stacking 2.5D images
                 img_list = []
                 for j in range(i - self.channel//2, i + self.channel//2 + 1):
@@ -52,14 +54,14 @@ class TiffDataset(Dataset):
                 img = np.vstack(img_list)
         except Exception as e:
             print(e)
-            print(self.paths[i])
+            print(self.low_res_paths[i])
             #pdb.set_trace()
 
 
-        return torch.from_numpy(img)
+        return torch.from_numpy(lowres_img), torch.from_numpy(highres_img)
 
     def __len__(self):
-        return len(self.paths)
+        return len(self.low_res_paths)
 
 
 class SupervisedDataset(Dataset):
@@ -90,6 +92,7 @@ class Noise2InverseDataset(Dataset):
         self.datasets = datasets #list of datasets for each split
         max_len = max(len(ds) for ds in datasets)
         min_len = min(len(ds) for ds in datasets)
+        print(max_len, min_len)
 
         assert min_len == max_len #checking each split has equal number of slices
 
@@ -125,50 +128,18 @@ class Noise2InverseDataset(Dataset):
 
     def __getitem__(self, i):
         # set crop index
-        non_crop_idex = i // self.num_crops #get the index of the original dataset length (no of slices * no of splits)
-        
-        num_splits = self.num_splits
-        slice_idx = non_crop_idex // num_splits #get the slice index so that every n index is the same slice but different split so different input and target
-        split_idx = non_crop_idex % num_splits #get the split index, ie which subset, 
 
-        input_idxs = self.input_idxs[split_idx]
-        target_idxs = self.target_idxs[split_idx]
+        slices = [ds[i] for ds in self.datasets] #take the slices in each split (dataset), read the file from __getitem__ TiffDataset
 
-        slices = [ds[slice_idx] for ds in self.datasets] #take the slices in each split (dataset), read the file from __getitem__ TiffDataset
+        low_res, high_res = slices[0]
 
+        low_res = low_res[None, ...]
+        high_res = high_res[None, ...]
 
-
-
-        # crop the slices 
-        if self.crop_size is not None:
-            # Convert each slice to a numpy array if needed
-            # directory operate on the tensor
-            # If we want the same random crop across all slices,
-            # we need to compute a single offset from the first slice's shape.
-            if (self.crop_size is not None) and (len(slices) > 0):
-                c, h, w = slices[0].shape
-                crop_h = self.crop_size
-                crop_w = self.crop_size
-                if (crop_h > 0 and crop_w > 0 and crop_h <= h and crop_w <= w):
-                    offset_y, offset_x = self._compute_random_offset(h, w, crop_h, crop_w)
-                    # Crop all slices with the same offset
-                    cropped_slices = [self._apply_crop(s, offset_y, offset_x, crop_h, crop_w)
-                                    for s in slices]
-
-            inputs = [cropped_slices[j] for j in input_idxs] #take the slice from the input splits
-            targets = [cropped_slices[j] for j in target_idxs] #take the slice from the target splits
-
-        else:
-            inputs = [slices[j] for j in input_idxs] #take the slice from the input splits
-            targets = [slices[j] for j in target_idxs]
-
-        inp = torch.mean(torch.stack(inputs), dim=0)
-        tgt = torch.mean(torch.stack(targets), dim=0)
-
-        return inp, tgt
+        return low_res, high_res
 
     def __len__(self):
-        return self.num_splits * self.num_slices * self.num_crops
+        return self.num_slices
 
     def _compute_random_offset(self, h, w, crop_h, crop_w):
         # Calculate the valid range for top-left corner of the crop
