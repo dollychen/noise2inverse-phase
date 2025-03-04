@@ -19,12 +19,12 @@ model_path: "/cluster/project7/HiP_CT_Denoise/models/noise2inverse_phase/" #wher
 resume_training: #path to checkpoint
 num_splits: 2
 strategy: "X:1" # "i:X"
-batch_size: 32 #split between gpus
+batch_size: 16 #split between gpus
 data_scaling: 65536 #65536 #for normalisation
-epochs: 50 #should be multiply of num_splits
+epochs: 200 #should be multiply of num_splits
 network: "unet" # "msd", "unet", "dncnn"
 multi_gpu: False
-n_features: 32
+n_features: 64
 input_channels: 1 #more for 2.5D
 gpu_id: 0 #set which gpu to use when not using multi_gpu
 
