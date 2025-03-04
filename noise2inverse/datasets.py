@@ -141,11 +141,32 @@ class Noise2InverseDataset(Dataset):
 
         # crop the slices 
         if self.crop_size is not None:
+            # would like to add fixed size cropping
+            if self.center_weight == -1: #TODO: this is used for testing purposea
+                # apply a fixed point crop 
+                c, h, w = slices[0].shape
+                crop_h = self.crop_size
+                crop_w = self.crop_size
+
+                offset_index = i % self.num_crops
+
+                # list of 5 offsets
+
+                offset_y = [h//2-self.crop_size//2, h//2-self.crop_size//2-self.crop_size, h//2-self.crop_size//2-self.crop_size, h//2+self.crop_size//2, h//2+self.crop_size//2]
+                offset_x = [w//2-self.crop_size//2, w//2-self.crop_size//2-self.crop_size, w//2+self.crop_size//2, w//2-self.crop_size//2-self.crop_size, w//2+self.crop_size//2]
+
+                cropped_slices = [self._apply_crop(s, offset_y[offset_index], offset_x[offset_index], crop_h, crop_w)
+                                    for s in slices]
+
+
+
+
+
             # Convert each slice to a numpy array if needed
             # directory operate on the tensor
             # If we want the same random crop across all slices,
             # we need to compute a single offset from the first slice's shape.
-            if (self.crop_size is not None) and (len(slices) > 0):
+            elif (self.crop_size is not None) and (len(slices) > 0):
                 c, h, w = slices[0].shape
                 crop_h = self.crop_size
                 crop_w = self.crop_size
