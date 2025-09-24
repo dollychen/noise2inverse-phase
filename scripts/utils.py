@@ -30,6 +30,29 @@ def percetile_stretch(img, top=5, bottom=95):
     img_rescale = exposure.rescale_intensity(img, in_range=(ptop, pbottom))
     return img_rescale
 
+def imagej_auto_contrast(img, saturated=0.7):
+    """
+    Approximate ImageJ's Auto Brightness/Contrast by saturating a small percentage
+    of pixels at both ends.
+
+    :param images: One or more NumPy 2D arrays.
+    :param saturated: Percentage of pixels to saturate at both low and high ends.
+                      ImageJ commonly uses ~0.35% by default, but you can adjust.
+    :return: A list of arrays, each scaled to [0,1] with a shared min/max across all images.
+    """
+    img = img.detach().cpu().numpy()
+    # Lower and upper percentiles to saturate (e.g. 0.35 and 99.65 if saturated=0.35)
+    p_lower = np.percentile(img, saturated)
+    p_upper = np.percentile(img, 100.0 - saturated)
+
+    # Avoid divide-by-zero
+    denom = p_upper - p_lower if p_upper > p_lower else 1e-8
+
+    scaled = (img - p_lower) / denom
+    scaled = np.clip(scaled, 0, 1)
+
+    return scaled
+
 def network_setup(network, multi_gpu, n_features=32, n_input_channels=1):
     """_summary_
 

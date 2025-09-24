@@ -30,6 +30,8 @@ class TiffDataset(Dataset):
         try:
             if self.channel == 1:
                 lowres_img = tifffile.imread(str(self.low_res_paths[i])).astype(np.float32)
+                if self.test:
+                    highres_img = np.zeros_like(lowres_img)
                 highres_img = tifffile.imread(str(self.high_res_paths[i])).astype(np.float32)
                 #if img.ndim == 2:
                 #    img = img[None, ...]

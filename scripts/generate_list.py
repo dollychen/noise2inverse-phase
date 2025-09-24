@@ -22,7 +22,8 @@ def main(args):
 
     if include_all:
         #get all images in the path
-        images = glob.glob(train_data_path + '/*{}'.format(file_ext))
+        images = sorted(glob.glob(train_data_path + '/*{}'.format(file_ext)))
+        # sort the images
         #write to file
         with open(output_file, 'w+') as f:
             for image in images:
@@ -31,7 +32,7 @@ def main(args):
         return
     elif imgs_to_include != -1:
         #randomly select images from the path
-        images = glob.glob(train_data_path + '/*{}'.format(file_ext))
+        images = sorted(glob.glob(train_data_path + '/*{}'.format(file_ext)))
         num_imgs = len(images)
         img_index = np.random.randint(0, num_imgs, size=imgs_to_include)
 

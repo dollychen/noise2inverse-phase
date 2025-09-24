@@ -165,7 +165,7 @@ if __name__ == "__main__":
     print("parse arguments")
 
     parser = argparse.ArgumentParser(description='Noise2Inverse inference script')
-    parser.add_argument('--config', type=str, default='./configs/kidney/inf_config_kidney.yaml', help='path to config file')
+    parser.add_argument('--config', type=str, default='./configs/test/inf_config_kidney.yaml', help='path to config file')
     args = parser.parse_args()
 
 
