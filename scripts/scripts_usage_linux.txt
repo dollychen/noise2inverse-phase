@@ -1,0 +1,4 @@
+python3 scripts/generate_list.py \
+--train_data_path /cluster/project7/HiP_CT_Denoise/HiPCT/orig_pag/split_2/0 \
+--file_ext ".tif" \
+--output_file configs/kidney/train_list_kidney_all.txt
