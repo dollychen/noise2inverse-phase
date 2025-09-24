@@ -1,0 +1,31 @@
+#wandb config
+wandb_project: "noise2inverse-phase" #test_project, noise2inverse
+wandb_run_mode: "offline" # online, offline, disabled
+job_name_prefix: kidney_25um_pag_split2_unet32_randomcrop_allscans #job name to identify the function [organ]_[res]_[pag]_[split]_[network]_[crop]_[scan]
+test_run: False  #sets wandb project as test_project, set true will only run a few batches per epoch
+
+#data config
+data_path: "/cluster/project7/HiP_CT_Denoise/HiPCT/orig_pag/split_2/" #training data
+train_data_list: "./configs/kidney/data_list_kidney_all.txt" #.txt file containing images to be trained
+no_val_img: 5 #number of images to use for validation
+fix_val_idx: 1210 #set a fixed image so that it is saved in all trainings
+crop_size: 1000 #leave empty for no crop
+centre_weight: 0.5
+no_crop_per_image: 5
+
+
+#model config
+model_path: "/cluster/project7/HiP_CT_Denoise/models/noise2inverse_phase/" #where to save the model
+resume_training: "/cluster/project7/HiP_CT_Denoise/models/noise2inverse_phase/kidney_25um_pag_split2_unet32_randomcrop_allscans_20250228-215440/weights_epoch_14_0.000007.torch" #path to checkpoint
+num_splits: 2
+strategy: "X:1" # "i:X"
+batch_size: 8 #split between gpus
+data_scaling: 65536 #65536 #for normalisation
+epochs: 30 #should be multiply of num_splits
+network: "unet" # "msd", "unet", "dncnn"
+multi_gpu: False
+n_features: 32
+input_channels: 1 #more for 2.5D
+gpu_id: 0 #set which gpu to use when not using multi_gpu
+
+
