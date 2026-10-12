@@ -1,0 +1,41 @@
+# Historical simple_unet_super_res reproduction.
+# The original 30-slice holdout (970-999) is extended symmetrically to 100
+# slices (935-1034) to meet the reproduction protocol.
+wandb_project: "test_project"
+wandb_run_mode: "disabled"
+job_name_prefix: "simple_unet_sr_historical_reproduction"
+run_name: "simple_unet_sr_historical_reproduction_20260901"
+test_run: false
+
+data_path: "D:/Dolly/A.Study/data/kidney_left/2021_17/SR_old_training_pair/data"
+low_res_dir: "LR/25.14_slice_0_3088_cropped_cube"
+high_res_dir: "HR/25.96_to_25.14_resample_image_slice_0_3088_cropped_cube"
+train_data_list: "experiments/manifests/simple_unet_sr_train_1765.txt"
+val_data_list: "experiments/manifests/simple_unet_sr_validation_100.txt"
+no_val_img: 100
+fix_val_idx: 970
+crop_size:
+centre_weight: 0.5
+no_crop_per_image: 2
+
+model_path: "experiments/models"
+resume_training:
+num_splits: 2
+strategy: "X:1"
+batch_size: 16
+data_scaling: 65536
+epochs: 200
+network: "unet"
+multi_gpu: false
+n_features: 64
+input_channels: 1
+gpu_id: 0
+
+# Explicit record of otherwise hard-coded historical settings.
+optimizer: "Adam"
+learning_rate: 0.001
+loss_function: "MSE"
+learning_rate_scheduler: null
+training_random_seed: null
+checkpoint_frequency_epochs: 1
+validation_frequency_epochs: 1

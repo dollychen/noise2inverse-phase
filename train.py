@@ -24,6 +24,8 @@ import torch.nn as nn
 print("importing other modules that should be fast")
 import datetime
 import os
+import csv
+import shutil
 import argparse
 import yaml
 from scripts.utils import percetile_stretch, psnr_skimage, ssim_skimage, network_setup
@@ -44,6 +46,9 @@ def train(params):
     # set parameters from params dict
     train_data_path = params["data_path"]
     train_data_list = params["train_data_list"]
+    val_data_list = params.get("val_data_list", train_data_list)
+    low_res_dir = params.get("low_res_dir", "low_res")
+    high_res_dir = params.get("high_res_dir", "high_res")
 
     model_dir = params["model_path"]
     resume_training = params["resume_training"]
@@ -92,9 +97,12 @@ def train(params):
     )
 
     #load dataset using the list given
-    train_datasets = [TiffDataset(f"{train_data_path}", train_data_list, channel=input_channels)]
+    train_datasets = [TiffDataset(f"{train_data_path}", train_data_list, channel=input_channels,
+                                  low_res_dir=low_res_dir, high_res_dir=high_res_dir)]
+    val_datasets = [TiffDataset(f"{train_data_path}", val_data_list, channel=input_channels,
+                                low_res_dir=low_res_dir, high_res_dir=high_res_dir)]
     train_ds = Noise2InverseDataset(*train_datasets, strategy=strategy, crop_size=crop_size, center_weight=centre_weight)
-    val_ds = Noise2InverseDataset(*train_datasets, strategy=strategy)
+    val_ds = Noise2InverseDataset(*val_datasets, strategy=strategy)
 
 
     print("--------------------------------------------------------------loading dataloader--------------------------------------------------------------")
@@ -102,14 +110,10 @@ def train(params):
     train_dl = DataLoader(train_ds, batch_size, shuffle=True,)
 
     #load the training data set unshuffled so that the same image could be identified and used for verifications
-    val_dl = DataLoader(val_ds, num_splits, shuffle=False)
+    val_dl = DataLoader(val_ds, batch_size, shuffle=False)
     #get a list of file names from the training data list
-    with open(train_data_list, 'r') as f:
+    with open(val_data_list, 'r') as f:
         val_img_names = f.read().splitlines()
-    # generate 10 images to check for over fitting
-    np.random.seed(0)
-    val_idx = np.random.randint(0,len(val_dl),size = 5)
-    wandb_index = val_idx[np.random.choice(len(val_idx))]
 
 
     print(f'number of slices in training is: {train_ds.num_slices}, \
@@ -179,6 +183,9 @@ def train(params):
         if create_dir:
             model_dir.mkdir(parents = True, exist_ok=True) # create model directory
             pred_dir.mkdir(parents = True, exist_ok=True) # create pred output directory
+            shutil.copy2(params["config_file"], model_dir / "train_config.yaml")
+            shutil.copy2(train_data_list, model_dir / "train_files.txt")
+            shutil.copy2(val_data_list, model_dir / "validation_files.txt")
             create_dir = False
 
         #Save network
@@ -198,39 +205,42 @@ def train(params):
 
         # run validation
         with torch.no_grad():           
-
-            # run the prediction
-            for i, (inp, tgt) in tqdm(enumerate(val_dl)):
-                if i not in val_idx:
-                    continue
+            val_loss_cum = 0
+            val_image_count = 0
+            val_ssim_cum = 0
+            val_psnr_cum = 0
+            # run prediction over the complete held-out validation set
+            for i, (inp, tgt) in tqdm(enumerate(val_dl), total=len(val_dl)):
                 torch.cuda.empty_cache() # clear GPU memory
                 test_inp = inp.cuda(non_blocking=True) / data_scaling # scale the input
+                test_tgt = tgt.cuda(non_blocking=True) / data_scaling
                 test_output = network(test_inp)
-                test_output_img = test_output[0] # averaged over batch size as it is the number of splits
+                val_loss_cum += nn.functional.mse_loss(test_output, test_tgt, reduction="sum").item()
+                for j, image in enumerate(test_output):
+                    image_index = i * batch_size + j
+                    test_out_np = image.detach().cpu().numpy().squeeze()
+                    tifffile.imwrite(str(train_output_dir / val_img_names[image_index]), test_out_np)
+                    val_ssim_cum += ssim_skimage(test_tgt[j], image)
+                    val_psnr_cum += psnr_skimage(test_tgt[j], image)
+                    val_image_count += 1
 
-                #save output image
-                test_out_np = (test_output_img).detach().cpu().numpy().squeeze()
-                out_path = str(train_output_dir / f"{val_img_names[i]}")
-                tifffile.imwrite(out_path, test_out_np)   
+        val_loss = val_loss_cum / (val_image_count * test_output.shape[-2] * test_output.shape[-1])
+        val_ssim = val_ssim_cum / val_image_count
+        val_psnr = val_psnr_cum / val_image_count
+        log_path = model_dir / "training_log.csv"
+        with open(log_path, "a", newline="") as log_file:
+            writer = csv.writer(log_file)
+            if log_file.tell() == 0:
+                writer.writerow(["epoch", "train_loss", "train_ssim", "train_psnr", "val_loss", "val_ssim", "val_psnr"])
+            writer.writerow([epoch, epoch_loss, avg_ssim, avg_psnr, val_loss, val_ssim, val_psnr])
 
-                # calculate ssim
-                image_ssim = ssim_skimage(tgt[0], test_output[0])
-                image_psnr = psnr_skimage(tgt[0], test_output[0])
-
-                #save the image to wandb
-                if i == wandb_index:
-                    test_img_name = val_img_names[i]
-                    image_in = wandb.Image(percetile_stretch(inp[0] * data_scaling), caption=f"input {test_img_name}")
-                    image_out = wandb.Image(percetile_stretch(test_output[0] * data_scaling), caption=f"output psnr: {image_psnr:.2f}, ssim: {image_ssim:.2f}")
-                    image_tgt = wandb.Image(percetile_stretch(tgt[0] * data_scaling), caption=f"target")
-                    image_avg = wandb.Image(percetile_stretch(test_output_img), caption="average output")
-
-
-        wandb.log({"loss": epoch_loss, 
-                   "images": (image_in, image_tgt, image_out, image_avg), 
+        wandb.log({"loss": epoch_loss,
                    "epoch": epoch,
                     "ssim": avg_ssim,
-                    "psnr": avg_psnr})
+                    "psnr": avg_psnr,
+                    "val_loss": val_loss,
+                    "val_ssim": val_ssim,
+                    "val_psnr": val_psnr})
 
     
 
@@ -251,13 +261,16 @@ if __name__ == "__main__":
 
     # load wandb config
     job_name_prefix = config['job_name_prefix']
-    job_name = f'{job_name_prefix}_{timestamp}' # job name to identify the run
+    job_name = config.get("run_name", f'{job_name_prefix}_{timestamp}') # job name to identify the run
     if config['test_run']:
         config['wandb_project'] = 'test_project' # set the wandb project to test_project for testing
     
     # convert data paths to Path objects
     config['data_path'] = Path(config['data_path'])
     config['train_data_list'] = Path(config['train_data_list'])
+    if config.get('val_data_list'):
+        config['val_data_list'] = Path(config['val_data_list'])
+    config['config_file'] = str(Path(args.config).resolve())
     
     # load model information
     config['model_path'] = Path(config['model_path'])/job_name

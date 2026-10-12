@@ -7,3 +7,7 @@ output_*.tif
 proj.h5
 !output_00256.tif
 /wandb
+/.venv/
+/.smoke/
+/experiments/models/
+/experiments/predictions/

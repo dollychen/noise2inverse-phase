@@ -16,13 +16,14 @@ class TiffDataset(Dataset):
     """Documentation for TiffDataset
 
     """
-    def __init__(self, img_path, img_list, channel=1, test=False):
+    def __init__(self, img_path, img_list, channel=1, test=False,
+                 low_res_dir="low_res", high_res_dir="high_res"):
         super(TiffDataset, self).__init__()
         #concatenate the path and the image name
         with open(img_list, 'r') as f:
             img_names = f.read().splitlines()
-        self.low_res_paths = [os.path.join(os.path.join(img_path, "low_res"),img) for img in img_names]
-        self.high_res_paths = [os.path.join(os.path.join(img_path, "high_res"),img) for img in img_names]
+        self.low_res_paths = [os.path.join(img_path, low_res_dir, img) for img in img_names]
+        self.high_res_paths = [os.path.join(img_path, high_res_dir, img) for img in img_names]
         self.channel = channel
         self.test = test
 
